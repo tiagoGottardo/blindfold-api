@@ -1,2 +1,2 @@
 # blindfold-api
-An api to play blindold chess against stockfish
+An api to play blindfold chess against stockfish
