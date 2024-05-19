@@ -13,15 +13,22 @@ pub struct InitializeGameRequest {
     stockfish_level: Option<u8>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PlayMoveRequest {
+    pub id: Uuid,
+    pub play: String,
+}
+
 #[derive(Serialize, Clone, Debug)]
 pub struct Game {
-    id: Uuid,
-    player_color: String,
-    start_position: String,
-    actual_position: String,
-    moves: Vec<[String; 2]>,
-    stockfish_level: u8,
-    finalized: bool,
+    pub id: Uuid,
+    pub player_color: String,
+    pub start_position: String,
+    pub actual_position: String,
+    pub moves: Vec<[String; 2]>,
+    pub full_moves_count: u8,
+    pub stockfish_level: u8,
+    pub finalized: bool,
 }
 
 pub type DB = Arc<Mutex<Vec<Game>>>;
@@ -35,6 +42,7 @@ impl Game {
         Self {
             id: Uuid::new_v4(),
             player_color: req.color.unwrap_or("white".to_string()),
+            full_moves_count: 1,
             start_position: req
                 .start_position
                 .clone()
