@@ -10,6 +10,7 @@ pub fn create_router() -> Router {
     Router::new()
         .route("/health", get(|| async { "It's okay" }))
         .route("/newgame", post(new_game_handler))
+        .route("/playmove", post(play_move))
         .with_state(db)
 }
 
