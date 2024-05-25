@@ -103,14 +103,18 @@ fn make_lan_move(fen: &str, lan_move: &str) -> Result<(String, String), ErrorDef
     Ok((san_notation_play, new_fen))
 }
 
-fn add_to_move_list(list: &mut Vec<[String; 2]>, play: &str, color: &str) {
-    if color == "w" {
-        list.push([String::from(play), String::from("")]);
-    } else {
-        if let Some(last) = list.last_mut() {
-            last[1] = String::from(play);
-        } else {
-            list.push([String::from(""), String::from(play)]);
+fn add_to_move_list(list: &mut Vec<[String; 2]>, play: &str, color: &PlayerColor) {
+    use crate::models::game::PlayerColor::*;
+    match color {
+        Black => {
+            if let Some(last) = list.last_mut() {
+                last[1] = String::from(play);
+            } else {
+                list.push([String::from("..."), String::from(play)]);
+            }
+        }
+        White => {
+            list.push([String::from(play), String::from("")]);
         }
     }
 }
@@ -179,11 +183,7 @@ pub async fn play_move(
 
     let (san_stockfish_move, new_fen) = make_lan_move(&new_fen, &stockfish_move)?;
 
-    add_to_move_list(
-        &mut game.moves,
-        &san_stockfish_move,
-        if game.player_color == "w" { "b" } else { "w" },
-    );
+    add_to_move_list(&mut game.moves, &san_stockfish_move, &game.player_color);
 
     game.actual_position = new_fen;
     game.full_moves_count += 1;
