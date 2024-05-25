@@ -2,7 +2,7 @@ use crate::handlers::game::*;
 use axum::routing::{get, post};
 use axum::Router;
 
-use crate::create_db;
+use crate::models::database::create_db;
 
 pub async fn create_router() -> Router {
     let db = create_db().await;

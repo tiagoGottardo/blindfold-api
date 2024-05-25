@@ -1,5 +1,6 @@
+use crate::models::database::DB;
+use crate::models::error::ErrorDefault;
 use crate::models::game::*;
-use crate::ErrorDefault;
 use axum::http::StatusCode;
 use chess::{Board, ChessMove};
 use std::io::Write;
@@ -7,7 +8,7 @@ use std::process::{Command, Stdio};
 use std::str::FromStr;
 
 use axum::extract::{Json, State};
-use axum::response::{Html, IntoResponse};
+use axum::response::IntoResponse;
 
 pub async fn new_game_handler(
     State(db): State<DB>,
@@ -19,7 +20,7 @@ pub async fn new_game_handler(
 
     vec.push(game.clone());
 
-    Html(format!("{:#?}", game))
+    Json(game).into_response()
 }
 
 fn remove_range(s: &str, start: usize, end: usize) -> String {
@@ -41,20 +42,19 @@ fn remove_range(s: &str, start: usize, end: usize) -> String {
 }
 
 fn make_san_move(fen: &str, san_move: &str) -> Result<String, ErrorDefault> {
-    let board = Board::from_str(fen).or_else(|_| {
+    let board = Board::from_str(fen).or_else(|e| {
         Err(ErrorDefault::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Something bad happen!",
+            e.to_string(),
         ))
     })?;
 
-    let chess_move = ChessMove::from_san(&board, san_move).or_else(|_| {
+    let chess_move = ChessMove::from_san(&board, san_move).or_else(|e| {
         Err(ErrorDefault::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Something bad happen!",
+            e.to_string(),
         ))
     })?;
-
     let mut new_board = Board::default();
     board.make_move(chess_move, &mut new_board);
 
@@ -76,10 +76,10 @@ fn make_lan_move(fen: &str, lan_move: &str) -> Result<(String, String), ErrorDef
         moves.push(remove_range(lan_move, 1, 2));
     }
 
-    let board = Board::from_str(&fen).or_else(|_| {
+    let board = Board::from_str(&fen).or_else(|e| {
         Err(ErrorDefault::new(
             StatusCode::INTERNAL_SERVER_ERROR,
-            "Something happen with Board!",
+            e.to_string(),
         ))
     })?;
 
@@ -121,43 +121,28 @@ fn stockfish_analizer(board_state: &str, stockfish_level: u8) -> Result<String, 
     let mut child = Command::new(stockfish_path)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .spawn()
-        .or_else(|_| {
-            Err(ErrorDefault::new(
+        .spawn()?;
+
+    let stdin = match child.stdin.as_mut() {
+        Some(std) => std,
+        _ => {
+            return Err(ErrorDefault::new(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Stockfish not found!",
             ))
-        })?;
+        }
+    };
 
-    {
-        let stdin = match child.stdin.as_mut() {
-            Some(std) => std,
-            _ => {
-                return Err(ErrorDefault::new(
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    "Stockfish not found!",
-                ))
-            }
-        };
+    writeln!(stdin, "uci")?;
+    writeln!(
+        stdin,
+        "setoption name Skill Level value {}",
+        stockfish_level
+    )?;
+    writeln!(stdin, "position fen {}", board_state)?;
+    writeln!(stdin, "go movetime 2000")?;
 
-        let _ = writeln!(stdin, "uci")
-            .and_then(|_| {
-                writeln!(
-                    stdin,
-                    "setoption name Skill Level value {}",
-                    stockfish_level
-                )
-            })
-            .and_then(|_| writeln!(stdin, "position fen {}", board_state))
-            .and_then(|_| writeln!(stdin, "go movetime 2000"));
-    }
-
-    let output = child.wait_with_output().or_else(|_| {
-        Err(ErrorDefault::new(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "Error With child",
-        ))
-    })?;
+    let output = child.wait_with_output()?;
 
     let output_str = String::from_utf8_lossy(&output.stdout);
 
@@ -166,7 +151,11 @@ fn stockfish_analizer(board_state: &str, stockfish_level: u8) -> Result<String, 
         .find(|line| line.starts_with("bestmove"))
         .unwrap_or("bestmove none");
 
-    Ok(best_move.split_whitespace().last().unwrap().to_string())
+    Ok(best_move
+        .split_whitespace()
+        .last()
+        .unwrap_or("none")
+        .to_string())
 }
 
 pub async fn play_move(
@@ -201,10 +190,16 @@ pub async fn play_move(
 
     match vec.iter_mut().find(|gamedb| gamedb.id == game.id) {
         Some(gamedb) => *gamedb = game,
-        None => return Ok(Html("Game not found!")),
+        None => {
+            return Ok((
+                StatusCode::INTERNAL_SERVER_ERROR,
+                String::from("Something bad happen internally!"),
+            ))
+        }
     };
 
-    Ok(Html(
-        format!("Stockfish play: {}", san_stockfish_move).leak(),
+    Ok((
+        StatusCode::OK,
+        format!("Stockfish play: {}", san_stockfish_move),
     ))
 }
