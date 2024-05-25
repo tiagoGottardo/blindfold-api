@@ -10,7 +10,7 @@ use tokio::net::TcpListener;
 async fn main() {
     let listener = TcpListener::bind("0.0.0.0:8000").await.unwrap();
 
-    let app = create_router();
+    let app = create_router().await;
 
     axum::serve(listener, app).await.unwrap();
 }
