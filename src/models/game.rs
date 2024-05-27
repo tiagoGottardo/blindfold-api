@@ -1,6 +1,8 @@
 const FEN_START_POSITION: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 const DEFAULT_STOCKFISH_LEVEL: u8 = 4;
 
+use std::ops::Not;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -29,11 +31,22 @@ pub struct Game {
     pub finalized: bool,
 }
 
-#[derive(PartialEq, Default, Clone, Serialize, Debug)]
+#[derive(PartialEq, Default, Clone, Serialize, Debug, Copy)]
 pub enum PlayerColor {
     #[default]
     White,
     Black,
+}
+
+impl Not for PlayerColor {
+    type Output = PlayerColor;
+    fn not(self) -> PlayerColor {
+        use PlayerColor::*;
+        match self {
+            White => Black,
+            Black => White,
+        }
+    }
 }
 
 impl PlayerColor {

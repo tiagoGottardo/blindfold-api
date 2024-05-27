@@ -11,5 +11,6 @@ pub async fn create_router() -> Router {
         .route("/health", get(|| async { "It's okay" }))
         .route("/newgame", post(new_game_handler))
         .route("/playmove", post(play_move))
+        .route("/gameinfo/:id", get(game_info_handler))
         .with_state(db)
 }
